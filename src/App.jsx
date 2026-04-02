@@ -173,7 +173,7 @@ function SearchInput({ label, placeholder, value, onChange, onSubmit, loading })
 }
 
 /* ─── Main App ──────────────────────────────────────────── */
-const SNOMED_BASE = import.meta.env.VITE_SNOMED_BASE || "https://browser.ihtsdotools.org/snowstorm/snomed-ct/browser/MAIN%2FSNOMEDCT-BE";
+const SNOMED_BASE = import.meta.env.VITE_SNOMED_BASE || "https://corsproxy.io/?url=https://browser.ihtsdotools.org/snowstorm/snomed-ct/browser/MAIN%2FSNOMEDCT-BE";
 const USE_PROXY = (import.meta.env.VITE_USE_PROXY || "false").toLowerCase() === "true";
 const API_BASE = USE_PROXY ? "http://localhost:4000/api" : SNOMED_BASE;
 
