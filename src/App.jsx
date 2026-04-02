@@ -173,6 +173,10 @@ function SearchInput({ label, placeholder, value, onChange, onSubmit, loading })
 }
 
 /* ─── Main App ──────────────────────────────────────────── */
+const SNOMED_BASE = import.meta.env.VITE_SNOMED_BASE || "https://browser.ihtsdotools.org/snowstorm/snomed-ct/browser/MAIN%2FSNOMEDCT-BE";
+const USE_PROXY = (import.meta.env.VITE_USE_PROXY || "false").toLowerCase() === "true";
+const API_BASE = USE_PROXY ? "http://localhost:4000/api" : SNOMED_BASE;
+
 export default function App() {
   const [conceptId, setConceptId] = useState("73211009");
   const [descTerm, setDescTerm] = useState("diabetes");
@@ -193,8 +197,21 @@ export default function App() {
     setConceptLoading(true);
     setConceptError("");
     setConceptResult(null);
+
+    const url = USE_PROXY
+      ? `${API_BASE}/concept?conceptId=${encodeURIComponent(conceptId.trim())}`
+      : `${API_BASE}/concepts/${encodeURIComponent(conceptId.trim())}`;
+
     try {
-      const res = await fetch(`/api/concept?conceptId=${encodeURIComponent(conceptId.trim())}`);
+      const res = await fetch(url, {
+        method: "GET",
+        mode: "cors",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          "Accept-Language": "en-US,en;q=0.9",
+        },
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
       setConceptResult(data);
@@ -219,7 +236,16 @@ export default function App() {
         offset: "0",
         limit: descLimit,
       });
-      const res = await fetch(`/api/descriptions?${params}`);
+      const url = USE_PROXY ? `${API_BASE}/descriptions?${params}` : `${API_BASE}/descriptions?${params}`;
+      const res = await fetch(url, {
+        method: "GET",
+        mode: "cors",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          "Accept-Language": "en-US,en;q=0.9",
+        },
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
       setDescResults(data);
