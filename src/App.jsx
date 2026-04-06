@@ -211,8 +211,21 @@ function SearchInput({ label, placeholder, value, onChange, onSubmit, loading })
 }
 
 /* ─── Main App ──────────────────────────────────────────── */
-const FHIR_BASE = import.meta.env.VITE_FHIR_BASE || "https://snowstorm.ihtsdotools.org/fhir";
+const FHIR_DIRECT = "https://snowstorm.ihtsdotools.org/fhir";
 const SNOMED_SYSTEM = "http://snomed.info/sct";
+
+/* In production (Vercel), proxy via /api/fhir to avoid CORS.
+   Locally with `vite dev`, call Snowstorm directly. */
+const USE_PROXY = import.meta.env.PROD;
+
+function fhirUrl(path, params) {
+  const qs = new URLSearchParams(params);
+  if (USE_PROXY) {
+    qs.set("path", path);
+    return `/api/fhir?${qs}`;
+  }
+  return `${FHIR_DIRECT}/${path}?${qs}`;
+}
 
 export default function App() {
   const [conceptId, setConceptId] = useState("73211009");
@@ -235,12 +248,11 @@ export default function App() {
     setConceptError("");
     setConceptResult(null);
 
-    const params = new URLSearchParams({
+    const url = fhirUrl("CodeSystem/$lookup", {
       system: SNOMED_SYSTEM,
       code: conceptId.trim(),
       property: "*",
     });
-    const url = `${FHIR_BASE}/CodeSystem/$lookup?${params}`;
 
     try {
       const res = await fetch(url, {
@@ -265,14 +277,13 @@ export default function App() {
     setDescError("");
     setDescResults(null);
     try {
-      const params = new URLSearchParams({
+      const url = fhirUrl("ValueSet/$expand", {
         url: `${SNOMED_SYSTEM}?fhir_vs`,
         filter: descTerm.trim(),
         count: descLimit,
         offset: "0",
         includeDesignations: "true",
       });
-      const url = `${FHIR_BASE}/ValueSet/$expand?${params}`;
       const res = await fetch(url, {
         method: "GET",
         mode: "cors",
