@@ -1,6 +1,9 @@
 import { useState, useCallback } from "react";
 
 /* ─── tiny helpers ─────────────────────────────────────── */
+const s = (obj) =>
+  Object.fromEntries(Object.entries(obj).map(([k, v]) => [k, typeof v === "object" ? v : String(v)]));
+
 const badge = (label, color = "#1e2a36") => (
   <span style={{
     background: color,
@@ -27,96 +30,55 @@ function Row({ label, value }) {
   );
 }
 
-/* ─── FHIR helpers ─────────────────────────────────────── */
-function fhirParam(params, name) {
-  const p = params?.find((p) => p.name === name);
-  return p?.valueString ?? p?.valueCode ?? p?.valueBoolean ?? p?.valueCoding?.display ?? undefined;
-}
-
-function fhirDesignations(params) {
-  return (params ?? [])
-    .filter((p) => p.name === "designation")
-    .map((d) => {
-      const parts = d.part ?? [];
-      const get = (n) => parts.find((p) => p.name === n);
-      return {
-        language: get("language")?.valueCode,
-        use: get("use")?.valueCoding?.display,
-        value: get("value")?.valueString,
-      };
-    });
-}
-
-function fhirProperties(params) {
-  return (params ?? [])
-    .filter((p) => p.name === "property")
-    .map((prop) => {
-      const parts = prop.part ?? [];
-      const code = parts.find((p) => p.name === "code")?.valueCode;
-      const val = parts.find((p) => p.name === "value");
-      const value = val?.valueCode ?? val?.valueString ?? val?.valueBoolean ?? val?.valueCoding?.display;
-      return { code, value };
-    });
-}
-
-/* ─── Concept result card (FHIR Parameters) ────────────── */
+/* ─── Concept result card ───────────────────────────────── */
 function ConceptCard({ data }) {
-  const params = data.parameter ?? [];
-  const code = fhirParam(params, "code");
-  const display = fhirParam(params, "display");
-  const name = fhirParam(params, "name");
-  const version = fhirParam(params, "version");
-  const inactive = params.find((p) => p.name === "property" && p.part?.some((pp) => pp.name === "code" && pp.valueCode === "inactive"));
-  const isActive = !inactive || !inactive.part?.find((pp) => pp.name === "value")?.valueBoolean;
-
-  const designations = fhirDesignations(params);
-  const fsn = designations.find((d) => d.use === "Fully specified name");
-  const properties = fhirProperties(params);
-
   return (
     <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: 20, marginTop: 16 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
         <span style={{ fontFamily: "var(--font-mono)", color: "var(--accent)", fontWeight: 500, fontSize: 15 }}>
-          {code}
+          {data.conceptId}
         </span>
-        {badge(isActive ? "ACTIVE" : "INACTIVE", isActive ? "#0d3326" : "#3a1018")}
-        {name && badge(name, "#1a2840")}
+        {data.active !== undefined && badge(data.active ? "ACTIVE" : "INACTIVE", data.active ? "#0d3326" : "#3a1018")}
+        {data.definitionStatus?.displayName && badge(data.definitionStatus.displayName, "#1a2840")}
       </div>
 
       <div style={{ fontSize: 17, fontWeight: 500, marginBottom: 14, color: "var(--text)" }}>
-        {display ?? "—"}
+        {data.pt?.term ?? data.fsn?.term ?? "—"}
       </div>
 
-      <Row label="FSN" value={fsn?.value} />
-      <Row label="Version" value={version} />
+      <Row label="FSN" value={data.fsn?.term} />
+      <Row label="Module" value={data.moduleId} />
+      <Row label="Effective time" value={data.effectiveTime} />
 
-      {properties.length > 0 && (
+      {data.descriptions?.length > 0 && (
         <details style={{ marginTop: 14 }}>
           <summary style={{ cursor: "pointer", color: "var(--accent2)", fontWeight: 500, fontSize: 13, listStyle: "none" }}>
-            ▸ {properties.length} propert{properties.length !== 1 ? "ies" : "y"}
+            ▸ {data.descriptions.length} description{data.descriptions.length !== 1 ? "s" : ""}
           </summary>
           <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
-            {properties.map((p, i) => (
-              <div key={i} style={{ background: "#0d1620", borderRadius: 4, padding: "8px 12px" }}>
-                <Row label="Code" value={p.code} />
-                <Row label="Value" value={String(p.value)} />
+            {data.descriptions.map((d) => (
+              <div key={d.descriptionId} style={{ background: "#0d1620", borderRadius: 4, padding: "8px 12px" }}>
+                <Row label="Term" value={d.term} />
+                <Row label="Type" value={d.typeId} />
+                <Row label="Lang" value={d.lang} />
+                <Row label="Active" value={String(d.active)} />
               </div>
             ))}
           </div>
         </details>
       )}
 
-      {designations.length > 0 && (
+      {data.relationships?.length > 0 && (
         <details style={{ marginTop: 10 }}>
           <summary style={{ cursor: "pointer", color: "var(--accent2)", fontWeight: 500, fontSize: 13, listStyle: "none" }}>
-            ▸ {designations.length} designation{designations.length !== 1 ? "s" : ""}
+            ▸ {data.relationships.length} relationship{data.relationships.length !== 1 ? "s" : ""}
           </summary>
           <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
-            {designations.map((d, i) => (
+            {data.relationships.map((r, i) => (
               <div key={i} style={{ background: "#0d1620", borderRadius: 4, padding: "8px 12px" }}>
-                <Row label="Term" value={d.value} />
-                <Row label="Use" value={d.use} />
-                <Row label="Lang" value={d.language} />
+                <Row label="Type" value={r.type?.pt?.term} />
+                <Row label="Target" value={r.target?.pt?.term} />
+                <Row label="Active" value={String(r.active)} />
               </div>
             ))}
           </div>
@@ -126,7 +88,7 @@ function ConceptCard({ data }) {
   );
 }
 
-/* ─── Description result row (FHIR expansion item) ────── */
+/* ─── Description result row ───────────────────────────── */
 function DescRow({ item, idx }) {
   return (
     <div style={{
@@ -141,16 +103,16 @@ function DescRow({ item, idx }) {
     }}>
       <span style={{ color: "var(--muted)", fontFamily: "var(--font-mono)", fontSize: 11, paddingTop: 2 }}>{idx + 1}</span>
       <div>
-        <div style={{ fontWeight: 500, marginBottom: 4 }}>{item.display}</div>
+        <div style={{ fontWeight: 500, marginBottom: 4 }}>{item.term}</div>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          {badge(item.code ?? "—", "#1a2840")}
-          {item.inactive !== undefined && badge(item.inactive ? "inactive" : "active", item.inactive ? "#3a1018" : "#0d3326")}
+          {badge(item.concept?.conceptId ?? "—", "#1a2840")}
+          {item.type?.displayName && badge(item.type.displayName, "#1e2a36")}
+          {item.lang && badge(item.lang.toUpperCase(), "#1a3020")}
+          {item.active !== undefined && badge(item.active ? "active" : "inactive", item.active ? "#0d3326" : "#3a1018")}
         </div>
-        {item.designation?.length > 0 && (
+        {item.concept?.pt?.term && (
           <div style={{ marginTop: 5, fontSize: 12, color: "var(--muted)" }}>
-            {item.designation.map((d, i) => (
-              <span key={i}>{d.use?.display}: {d.value}{i < item.designation.length - 1 ? " · " : ""}</span>
-            ))}
+            Concept: {item.concept.pt.term}
           </div>
         )}
       </div>
@@ -211,8 +173,9 @@ function SearchInput({ label, placeholder, value, onChange, onSubmit, loading })
 }
 
 /* ─── Main App ──────────────────────────────────────────── */
-const FHIR_BASE = import.meta.env.VITE_FHIR_BASE || "https://snowstorm.ihtsdotools.org/fhir";
-const SNOMED_SYSTEM = "http://snomed.info/sct";
+const SNOMED_BASE = import.meta.env.VITE_SNOMED_BASE || "https://browser.ihtsdotools.org/snowstorm/snomed-ct/browser/MAIN%2FSNOMEDCT-BE";
+const USE_PROXY = (import.meta.env.VITE_USE_PROXY || "false").toLowerCase() === "true";
+const API_BASE = USE_PROXY ? "http://localhost:4000/api" : SNOMED_BASE;
 
 export default function App() {
   const [conceptId, setConceptId] = useState("73211009");
@@ -228,28 +191,29 @@ export default function App() {
   const [conceptError, setConceptError] = useState("");
   const [descError, setDescError] = useState("");
 
-  /* fetch concept via FHIR CodeSystem/$lookup */
+  /* fetch concept */
   const fetchConcept = useCallback(async () => {
     if (!conceptId.trim()) return;
     setConceptLoading(true);
     setConceptError("");
     setConceptResult(null);
 
-    const params = new URLSearchParams({
-      system: SNOMED_SYSTEM,
-      code: conceptId.trim(),
-      property: "*",
-    });
-    const url = `${FHIR_BASE}/CodeSystem/$lookup?${params}`;
+    const url = USE_PROXY
+      ? `${API_BASE}/concept?conceptId=${encodeURIComponent(conceptId.trim())}`
+      : `${API_BASE}/concepts/${encodeURIComponent(conceptId.trim())}`;
 
     try {
       const res = await fetch(url, {
         method: "GET",
         mode: "cors",
-        headers: { Accept: "application/fhir+json" },
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          "Accept-Language": "en-US,en;q=0.9",
+        },
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.issue?.[0]?.diagnostics ?? `HTTP ${res.status}`);
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
       setConceptResult(data);
     } catch (e) {
       setConceptError(e.message);
@@ -258,7 +222,7 @@ export default function App() {
     }
   }, [conceptId]);
 
-  /* fetch descriptions via FHIR ValueSet/$expand */
+  /* fetch descriptions */
   const fetchDescriptions = useCallback(async () => {
     if (!descTerm.trim()) return;
     setDescLoading(true);
@@ -266,21 +230,25 @@ export default function App() {
     setDescResults(null);
     try {
       const params = new URLSearchParams({
-        url: `${SNOMED_SYSTEM}?fhir_vs`,
-        filter: descTerm.trim(),
-        count: descLimit,
+        term: descTerm.trim(),
+        groupByConcept: "false",
+        searchMode: "STANDARD",
         offset: "0",
-        includeDesignations: "true",
+        limit: descLimit,
       });
-      const url = `${FHIR_BASE}/ValueSet/$expand?${params}`;
+      const url = USE_PROXY ? `${API_BASE}/descriptions?${params}` : `${API_BASE}/descriptions?${params}`;
       const res = await fetch(url, {
         method: "GET",
         mode: "cors",
-        headers: { Accept: "application/fhir+json" },
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          "Accept-Language": "en-US,en;q=0.9",
+        },
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.issue?.[0]?.diagnostics ?? `HTTP ${res.status}`);
-      setDescResults(data.expansion ?? {});
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      setDescResults(data);
     } catch (e) {
       setDescError(e.message);
     } finally {
@@ -314,7 +282,7 @@ export default function App() {
           SNOMED CT Explorer
         </span>
         <span style={{ color: "var(--muted)", fontFamily: "var(--font-mono)", fontSize: 11 }}>
-          HL7 FHIR
+          MAIN/SNOMEDCT-BE
         </span>
       </header>
 
@@ -392,11 +360,11 @@ export default function App() {
           {descResults && (
             <div style={{ marginTop: 16 }}>
               <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--muted)", marginBottom: 10 }}>
-                {descResults.total ?? descResults.contains?.length ?? 0} total · showing {descResults.contains?.length ?? 0}
+                {descResults.total ?? descResults.items?.length ?? 0} total · showing {descResults.items?.length ?? 0}
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {(descResults.contains ?? []).map((item, i) => (
-                  <DescRow key={`${item.code}-${i}`} item={item} idx={i} />
+                {(descResults.items ?? []).map((item, i) => (
+                  <DescRow key={item.descriptionId ?? i} item={item} idx={i} />
                 ))}
               </div>
             </div>
