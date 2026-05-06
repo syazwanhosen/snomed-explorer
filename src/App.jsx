@@ -1,5 +1,7 @@
 import { useState, useCallback } from "react";
 
+const BRANCH = "MAIN/2026-04-01"
+
 /* ─── tiny helpers ─────────────────────────────────────── */
 const s = (obj) =>
   Object.fromEntries(Object.entries(obj).map(([k, v]) => [k, typeof v === "object" ? v : String(v)]));
@@ -198,9 +200,7 @@ export default function App() {
     setConceptError("");
     setConceptResult(null);
 
-    const url = USE_PROXY
-      ? `${API_BASE}/concept?conceptId=${encodeURIComponent(conceptId.trim())}`
-      : `${API_BASE}/concepts/${encodeURIComponent(conceptId.trim())}`;
+    const url = `/snowstorm/${BRANCH}/concepts/${encodeURIComponent(conceptId.trim())}`
 
     try {
       const res = await fetch(url, {
@@ -236,7 +236,7 @@ export default function App() {
         offset: "0",
         limit: descLimit,
       });
-      const url = USE_PROXY ? `${API_BASE}/descriptions?${params}` : `${API_BASE}/descriptions?${params}`;
+      const url = `/snowstorm/browser/${BRANCH}/descriptions?${params.toString()}`;
       const res = await fetch(url, {
         method: "GET",
         mode: "cors",
